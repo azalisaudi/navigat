@@ -2,7 +2,7 @@
 // Author: Azali Saudi
 // Date Created : 30 Dec 2016
 // Last Modified: 04 Jan 2017
-//                01 Oct 2018
+//                17 Oct 2018
 // Task: The GUI for Robot Path Planning
 //                   Agent Navigation
 //
@@ -76,16 +76,27 @@ public class Planner extends JFrame implements ActionListener {
         fileMenu.addActionListener(this);
         fileMenu.add(LOAD_MAP).addActionListener(this);
         fileMenu.addSeparator();
-        fileMenu.add(RUN_ITER).addActionListener(this);
-        fileMenu.add(RUN_GDS ).addActionListener(this);
+        
+        //fileMenu.add(RUN_ITER).addActionListener(this);
+        JMenuItem miRunIter = new JMenuItem(RUN_ITER);
+        miRunIter.addActionListener(this);
+        miRunIter.setAccelerator(KeyStroke.getKeyStroke('R', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
+        fileMenu.add(miRunIter);
+        
+        //fileMenu.add(RUN_GDS ).addActionListener(this);
+        JMenuItem miRunGDS = new JMenuItem(RUN_GDS);
+        miRunGDS.addActionListener(this);
+        miRunGDS.setAccelerator(KeyStroke.getKeyStroke('G', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
+        fileMenu.add(miRunGDS);
+        
         fileMenu.addSeparator();
         fileMenu.add(SAVE_MAP).addActionListener(this);
         fileMenu.add(SAVE_MATRIX).addActionListener(this);
         fileMenu.add(LOAD_MATRIX).addActionListener(this);
         fileMenu.addSeparator();
         fileMenu.add("Exit").addActionListener((ActionEvent event) -> { System.exit(0); });
-        menu.add(fileMenu);
 
+        menu.add(fileMenu);
         menu.setBounds(0, 0, Width, 20);
         content.add(menu);
 
@@ -211,7 +222,7 @@ public class Planner extends JFrame implements ActionListener {
                 int returnVal = chooser.showOpenDialog(null);
                 if(returnVal == JFileChooser.APPROVE_OPTION) {
                     File fout = chooser.getSelectedFile();
-                    String fileName = fout.getName();
+                    fileName = fout.getName();
                     mapImage = ImageIO.read(new File(fileName));
                     taNote.append(fileName + "\n");
                     canvas.repaint();
@@ -373,6 +384,15 @@ public class Planner extends JFrame implements ActionListener {
                     solver.updateMatrix();
                 }
                 taNote.append(String.format(">>> AOR, w=%.2f, r=%.2f\n", w, r));
+            } else
+            if (tfMethod.getText().toUpperCase().equals("KSOR")) {
+                while(!converge) {
+                    solver.doKSOR(w);
+                    label.setText(String.format("%d", ++iteration));
+                    converge = solver.checkConverge();
+                    solver.updateMatrix();
+                }
+                taNote.append(String.format(">>> KSOR, w=%.2f\n", w));
             }
 
             long stopTime = System.nanoTime();
