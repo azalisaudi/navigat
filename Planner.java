@@ -1,10 +1,8 @@
 //
 // Author: Azali Saudi
 // Date Created : 30 Dec 2016
-// Last Modified: 04 Jan 2017
-//                17 Oct 2018
-// Task: The GUI for Robot Path Planning
-//                   Agent Navigation
+// Last Modified: 21 Jan 2019
+// Task: The GUI for Path Planning of Agent Navigation
 //
 
 import java.awt.*;
@@ -23,6 +21,7 @@ import java.util.TimerTask;
 import java.awt.Point;
 import java.util.LinkedList;
 import java.util.Queue;
+import javax.swing.JOptionPane;
 
 public class Planner extends JFrame implements ActionListener {
     //Display parameters
@@ -59,10 +58,12 @@ public class Planner extends JFrame implements ActionListener {
     public static Timer timer;
     public static Queue<Point> Q;
     public static String fileName;
+    public static JScrollPane scroll;
 
     //The solver
     public Solver solver;
     public Thread iteratorThread;
+    public boolean isInitialized = false;
 
     public Planner() {
         setTitle("Planner");
@@ -76,27 +77,17 @@ public class Planner extends JFrame implements ActionListener {
         fileMenu.addActionListener(this);
         fileMenu.add(LOAD_MAP).addActionListener(this);
         fileMenu.addSeparator();
-        
-        //fileMenu.add(RUN_ITER).addActionListener(this);
-        JMenuItem miRunIter = new JMenuItem(RUN_ITER);
-        miRunIter.addActionListener(this);
-        miRunIter.setAccelerator(KeyStroke.getKeyStroke('R', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
-        fileMenu.add(miRunIter);
-        
-        //fileMenu.add(RUN_GDS ).addActionListener(this);
-        JMenuItem miRunGDS = new JMenuItem(RUN_GDS);
-        miRunGDS.addActionListener(this);
-        miRunGDS.setAccelerator(KeyStroke.getKeyStroke('G', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
-        fileMenu.add(miRunGDS);
-        
+        fileMenu.add(RUN_ITER).addActionListener(this);
+        fileMenu.add(RUN_GDS ).addActionListener(this);
         fileMenu.addSeparator();
         fileMenu.add(SAVE_MAP).addActionListener(this);
+        fileMenu.addSeparator();
         fileMenu.add(SAVE_MATRIX).addActionListener(this);
         fileMenu.add(LOAD_MATRIX).addActionListener(this);
         fileMenu.addSeparator();
         fileMenu.add("Exit").addActionListener((ActionEvent event) -> { System.exit(0); });
-
         menu.add(fileMenu);
+
         menu.setBounds(0, 0, Width, 20);
         content.add(menu);
 
@@ -105,10 +96,11 @@ public class Planner extends JFrame implements ActionListener {
         content.add(label);
 
         canvas = new Map();
-        canvas.setBounds(10, 50, Width-40, Height);
-        content.add(canvas);
+        scroll = new JScrollPane(canvas);
+        scroll.setBounds(10, 50, Width-40, Height);
+        content.add(scroll);
 
-        tfMethod = new JTextField("SOR");
+        tfMethod = new JTextField("KSOR");
         tfMethod.setBounds(200,Height+60, 80,25);
         content.add(tfMethod);
 
@@ -124,7 +116,7 @@ public class Planner extends JFrame implements ActionListener {
         tfGoalY = new JTextField("146");
         tfGoalY.setBounds(241,Height+110, 39,25);
         content.add(tfGoalY);
-        tfW1 = new JTextField("1.80");
+        tfW1 = new JTextField("-2.18"); // SOR: 1.80
         tfW1.setBounds(10,Height+60, 50,25);
         content.add(tfW1);
         tfW2 = new JTextField("1.82");
@@ -137,10 +129,10 @@ public class Planner extends JFrame implements ActionListener {
         tfR2 = new JTextField("1.86");
         tfR2.setBounds(80,Height+85, 50,25);
         content.add(tfR2);
-        tfR3 = new JTextField("1.88");
+        tfR3 = new JTextField("1.95");
         tfR3.setBounds(80,Height+110,50,25);
         content.add(tfR3);
-        tfR4 = new JTextField("1.90");
+        tfR4 = new JTextField("1.96");
         tfR4.setBounds(80,Height+135,50,25);
         content.add(tfR4);
 
@@ -155,8 +147,6 @@ public class Planner extends JFrame implements ActionListener {
 
         setSize(Width, Height+200);
         setVisible(true);
-		setVisible(false);
-		setVisible(true);
     }
 
     public void init() {
@@ -166,6 +156,7 @@ public class Planner extends JFrame implements ActionListener {
         catch (Exception e) {
             e.printStackTrace();
         }
+        repaint();
     }
 
     class Map extends JPanel {
@@ -195,6 +186,10 @@ public class Planner extends JFrame implements ActionListener {
             g2d.fill(circle);
         }
 
+        public Dimension getPreferredSize() {
+            return new Dimension(mapImage.getWidth()+400, mapImage.getHeight()+400);
+        }
+
         private class MyMouse extends MouseAdapter {
             public void mousePressed(MouseEvent evt) {
                 int x = evt.getX();
@@ -208,7 +203,6 @@ public class Planner extends JFrame implements ActionListener {
                     tfGoalX.setText(Integer.toString(x));
                     tfGoalY.setText(Integer.toString(y));
                 }
-                revalidate();
                 repaint();
             }
         }
@@ -235,6 +229,8 @@ public class Planner extends JFrame implements ActionListener {
         else if (str.equals(RUN_ITER)) {
             init();   // Load map file
             canvas.repaint();
+
+//            runIter();
 
             iteratorThread = new Thread(new Iterator());
             iteratorThread.start();
@@ -272,9 +268,22 @@ public class Planner extends JFrame implements ActionListener {
                 int returnVal = chooser.showSaveDialog(null);
                 if(returnVal == JFileChooser.APPROVE_OPTION) {
                     File fout = chooser.getSelectedFile();
-                    String saveFilename = fout.getName();
+                    String fname = fout.getName();
 
-					solver.saveMatrix(saveFilename);
+                    int gx = Integer.parseInt(tfGoalX.getText());
+                    int gy = Integer.parseInt(tfGoalY.getText());
+                    init();
+                    canvas.repaint();
+
+                    if(isInitialized == false) {
+                        solver = new Solver(mapImage, gx, gy);
+                        isInitialized = true;
+                    }
+                    solver.saveMatrix(fname);
+                    JOptionPane.showMessageDialog(null,
+                                                  "Done",
+                                                  "Save Matrix",
+                                                  JOptionPane.INFORMATION_MESSAGE);
                 }
             }
             catch (Exception e) {
@@ -284,17 +293,22 @@ public class Planner extends JFrame implements ActionListener {
         else if (str.equals(LOAD_MATRIX)) {
             try {
                 JFileChooser chooser = new JFileChooser(new File(".").getCanonicalPath());
-                int returnVal = chooser.showSaveDialog(null);
+                int returnVal = chooser.showOpenDialog(null);
                 if(returnVal == JFileChooser.APPROVE_OPTION) {
                     File fout = chooser.getSelectedFile();
-                    String saveFilename = fout.getName();
-                    
-					int gx = Integer.parseInt(tfGoalX.getText());
-					int gy = Integer.parseInt(tfGoalY.getText());
-                    if(solver == null) {
-						solver = new Solver(mapImage, gx, gy);
-					}
-					solver.loadMatrix(saveFilename);
+                    String fname = fout.getName();
+
+                    int gx = Integer.parseInt(tfGoalX.getText());
+                    int gy = Integer.parseInt(tfGoalY.getText());
+                    solver = new Solver(mapImage, gx, gy);
+                    init();
+                    canvas.repaint();
+
+                    solver.loadMatrix(fname);
+                    JOptionPane.showMessageDialog(null,
+                                                  "Done",
+                                                  "Load Matrix",
+                                                  JOptionPane.INFORMATION_MESSAGE);
                 }
             }
             catch (Exception e) {
@@ -330,75 +344,249 @@ public class Planner extends JFrame implements ActionListener {
     }
 
     class Iterator implements Runnable {
+        private void displayMeter(int it) {
+            if((it % 1000) == 0) {
+               label.setText(String.format("%d", it));
+            }
+        }
         public void run() {
             int gx = Integer.parseInt(tfGoalX.getText());
             int gy = Integer.parseInt(tfGoalY.getText());
+
             double w = Float.parseFloat(tfW1.getText());
             double ww= Float.parseFloat(tfW2.getText());
+
             double r = Float.parseFloat(tfR1.getText());
             double s = Float.parseFloat(tfR2.getText());
             double t = Float.parseFloat(tfR3.getText());
             double u = Float.parseFloat(tfR4.getText());
+
             int iteration = 0;
             boolean converge = false;
+
+            long elapsedTime;
+            long stopTime;
             long startTime = System.nanoTime();
 
-			solver = null;
             solver = new Solver(mapImage, gx, gy);
-            
-            /**
-             * This is where we add option for future additional methods.
-             */
-            if (tfMethod.getText().toUpperCase().equals("Jacobi")) {
-                while(!converge) {
-                    solver.doJacobi(w);
-                    label.setText(String.format("%d", ++iteration));
-                    converge = solver.checkConverge();
-                    solver.updateMatrix();
-                }
-                taNote.append(">>> Jacobi\n");
-            } else
+            isInitialized = true;
+
+            // FULL-SWEEP CPU
             if (tfMethod.getText().toUpperCase().equals("GS")) {
                 while(!converge) {
-                    solver.doGS(w);
-                    label.setText(String.format("%d", ++iteration));
+                    solver.doGS();
+                    displayMeter(++iteration);
                     converge = solver.checkConverge();
                     solver.updateMatrix();
                 }
-                taNote.append(">>> GS\n");
+                label.setText(String.format("%d", iteration));
+                taNote.append(String.format(">>> GS\n"));
             } else
             if (tfMethod.getText().toUpperCase().equals("SOR")) {
                 while(!converge) {
                     solver.doSOR(w);
-                    label.setText(String.format("%d", ++iteration));
+                    displayMeter(++iteration);
                     converge = solver.checkConverge();
                     solver.updateMatrix();
                 }
+                label.setText(String.format("%d", iteration));
                 taNote.append(String.format(">>> SOR, w=%.2f\n", w));
             } else
             if (tfMethod.getText().toUpperCase().equals("AOR")) {
                 while(!converge) {
                     solver.doAOR(w, r);
-                    label.setText(String.format("%d", ++iteration));
+                    displayMeter(++iteration);
                     converge = solver.checkConverge();
                     solver.updateMatrix();
                 }
+                label.setText(String.format("%d", iteration));
                 taNote.append(String.format(">>> AOR, w=%.2f, r=%.2f\n", w, r));
             } else
+            if (tfMethod.getText().toUpperCase().equals("TOR")) {
+                while(!converge) {
+                    solver.doTOR(w, r, s);
+                    displayMeter(++iteration);
+                    converge = solver.checkConverge();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                taNote.append(String.format(">>> TOR, w=%.2f, r=%.2f, s=%.2f\n", w, r, s));
+            } else
+            if (tfMethod.getText().toUpperCase().equals("QOR")) {
+                while(!converge) {
+                    solver.doQOR(w, r, s, t, u);
+                    displayMeter(++iteration);
+                    converge = solver.checkConverge();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                taNote.append(String.format(">>> QOR, w=%.2f, r=%.2f, s=%.2f, t=%.2f, u=%.2f\n", w, r, s, t, u));
+            } else
+
+
+
+
+
+			// KSOR on CPU
             if (tfMethod.getText().toUpperCase().equals("KSOR")) {
                 while(!converge) {
                     solver.doKSOR(w);
-                    label.setText(String.format("%d", ++iteration));
+                    displayMeter(++iteration);
                     converge = solver.checkConverge();
                     solver.updateMatrix();
                 }
+                label.setText(String.format("%d", iteration));
                 taNote.append(String.format(">>> KSOR, w=%.2f\n", w));
+            } else
+            // HSKSOR on CPU
+            if (tfMethod.getText().toUpperCase().equals("HSKSOR")) {
+                while(!converge) {
+                    solver.doHSKSOR(w);
+                    displayMeter(++iteration);
+                    converge = solver.checkConvergeHS();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                solver.doFillHS();
+                solver.updateMatrix();
+                taNote.append(String.format(">>> HSKSOR, w=%.2f\n", w));
+            } else
+            // QSKSOR on CPU
+            if (tfMethod.getText().toUpperCase().equals("QSKSOR")) {
+                while(!converge) {
+                    solver.doQSKSOR(w);
+                    displayMeter(++iteration);
+                    converge = solver.checkConvergeQS();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                solver.doFillQS();
+                solver.updateMatrix();
+                taNote.append(String.format(">>> QSKSOR, w=%.2f\n", w));
+            } else
+
+			//
+			// KAOR -- CPU
+			//
+            if (tfMethod.getText().toUpperCase().equals("KAOR")) {
+                while(!converge) {
+                    solver.doKAOR(w, r);
+                    displayMeter(++iteration);
+                    converge = solver.checkConverge();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                taNote.append(String.format(">>> KAOR, w=%.2f, r=%.2f\n", w, r));
+            } else
+
+
+
+            // HALF-SWEEP CPU
+            if (tfMethod.getText().toUpperCase().equals("HSSOR")) {
+                while(!converge) {
+                    solver.doHSSOR(w);
+                    displayMeter(++iteration);
+                    converge = solver.checkConvergeHS();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                solver.doFillHS();
+                solver.updateMatrix();
+                taNote.append(String.format(">>> HSSOR, w=%.2f\n", w));
+            } else
+            // QUARTER-SWEEP CPU
+            if (tfMethod.getText().toUpperCase().equals("QSSOR")) {
+                while(!converge) {
+                    solver.doQSSOR(w);
+                    displayMeter(++iteration);
+                    converge = solver.checkConvergeQS();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                solver.doFillQS();
+                solver.updateMatrix();
+                taNote.append(String.format(">>> QSSOR, w=%.2f\n", w));
+            } else
+
+ 
+
+
+
+            // FULL-SWEEP MODIFIED CPU
+            if (tfMethod.getText().toUpperCase().equals("MSOR")) {
+                while(!converge) {
+                    solver.doMSOR(w, ww);
+                    displayMeter(++iteration);
+                    converge = solver.checkConverge();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                taNote.append(String.format(">>> MSOR, w=%.2f, ww=%.2f\n", w, ww));
+            } else
+            if (tfMethod.getText().toUpperCase().equals("MAOR")) {
+                while(!converge) {
+                    solver.doMAOR(w, ww, r);
+                    displayMeter(++iteration);
+                    converge = solver.checkConverge();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                taNote.append(String.format(">>> MAOR, w=%.2f, ww=%.2f, r=%.2f\n", w, ww, r));
+            } else
+
+
+            // HALF-SWEEP MODIFIED CPU
+            if (tfMethod.getText().toUpperCase().equals("HSMSOR")) {
+                while(!converge) {
+                    solver.doHSMSOR(w, ww);
+                    displayMeter(++iteration);
+                    converge = solver.checkConvergeHS();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                solver.doFillHS();
+                solver.updateMatrix();
+                taNote.append(String.format(">>> HSMSOR, w=%.2f, ww=%.2f\n", w, ww));
+            } else
+
+
+            // QUARTER-SWEEP MODIFIED CPU
+            if (tfMethod.getText().toUpperCase().equals("QSMSOR")) {
+                solver.doInitRB();
+                while(!converge) {
+                    solver.doQSMSOR(w, ww);
+                    displayMeter(++iteration);
+                    converge = solver.checkConvergeQS();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                solver.doFillQS();
+                solver.updateMatrix();
+                taNote.append(String.format(">>> QSMSOR, w=%.2fm ww=%.2f\n", w, ww));
+            } else
+            if (tfMethod.getText().toUpperCase().equals("QSMAOR")) {
+                solver.doInitRB();
+                while(!converge) {
+                    solver.doQSMAOR(w, ww, r);
+                    displayMeter(++iteration);
+                    converge = solver.checkConvergeQS();
+                    solver.updateMatrix();
+                }
+                label.setText(String.format("%d", iteration));
+                solver.doFillQS();
+                solver.updateMatrix();
+                taNote.append(String.format(">>> QSMAOR, w=%.2fm ww=%.2f r=%.2f\n", w, ww, r));
             }
 
-            long stopTime = System.nanoTime();
-            long elapsed = stopTime - startTime;
-            elapsed = TimeUnit.NANOSECONDS.toMillis(elapsed); // Total elapsed in ms
-            displayLog(iteration, elapsed);
+
+            // NONE OF THE ABOVE
+            else {
+                System.out.println("Iteration Method Not Found!!!");
+            }
+
+            stopTime = System.nanoTime();
+            elapsedTime = TimeUnit.NANOSECONDS.toMillis(stopTime - startTime); // Total elapsed in ms
+            displayLog(iteration, elapsedTime);
         }
     }
 
